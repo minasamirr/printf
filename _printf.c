@@ -1,222 +1,80 @@
-#include <stdarg.h>
-#include <unistd.h>
 #include "main.h"
 
 /**
- * _printf - Custom printf function
- * @format: The format string
+ * print_buffer - Prints the contents of a character buffer, if it exists.
  *
- * Return: The number of characters printed
+ * This function is responsible for printing the contents of the character
+ * buffer to the standard output (typically the console). If the buffer
+ * contains data, it is printed, and the buffer index (length)
+ * is reset to zero.
+ *
+ * @buffer: The character array containing the data to be printed.
+ * @buff_ind: A pointer to an integer indicating
+ * the current buffer index/length.
+ */
+void print_buffer(char buffer[], int *buff_ind)
+{
+	if (*buff_ind > 0)
+		write(1, &buffer[0], *buff_ind);
+
+	*buff_ind = 0;
+}
+
+/**
+ * _printf - Custom printf function
+ *
+ * This function provides a custom implementation of the printf function
+ * for formatted output. It processes the format string and its optional
+ * format specifiers, allowing for customized printing of various data types
+ * and text. The function supports standard format specifiers and provides
+ * options for width, precision, and flags to control formatting.
+ *
+ * @format: The format string that contains the text and format specifiers.
+ *
+ * Return: The total number of characters printed to the standard output.
+ *         Returns -1 on error.
  */
 int _printf(const char *format, ...)
 {
-    va_list args;
-    int count = 0;
-    char buffer[1024];
-    int i;
+	int i, printed = 0, printed_chars = 0;
+	int flags, width, precision, size, buff_ind = 0;
+	va_list list;
+	char buffer[BUFF_SIZE];
 
-    va_start(args, format);
+	if (format == NULL)
+		return (-1);
 
-    while (format && *format)
-    {
-        if (*format == '%')
-        {
-            format++;
-            if (*format == '\0')
-                break;
+	va_start(list, format);
 
-            if (*format == 'c')
-            {
-                char c = va_arg(args, int);
-                write(1, &c, 1);
-                count++;
-            }
-            else if (*format == 's')
-            {
-                char *str = va_arg(args, char *);
-                if (!str)
-                    str = "(null)";
-                while (*str)
-                {
-                    write(1, str, 1);
-                    str++;
-                    count++;
-                }
-            }
-            else if (*format == '%')
-            {
-                write(1, "%", 1);
-                count++;
-            }
-            else if (*format == 'd' || *format == 'i')
-            {
-                int num = va_arg(args, int);
-                int len = 0;
-                int temp = num;
-                
-		if (num < 0)
-                {
-                    write(1, "-", 1);
-                    count++;
-                    num = num * (-1);
-                }
-                if (num == 0)
-                {
-                    buffer[len++] = '0';
-                }
-                else
-                {
-                    while (temp != 0)
-                    {
-                        buffer[len++] = (temp % 10) + '0';
-                        temp /= 10;
-                    }
-                }
+	for (i = 0; format && format[i] != '\0'; i++)
+	{
+		if (format[i] != '%')
+		{
+			buffer[buff_ind++] = format[i];
+			if (buff_ind == BUFF_SIZE)
+				print_buffer(buffer, &buff_ind);
+			/* write(1, &format[i], 1);*/
+			printed_chars++;
+		}
+		else
+		{
+			print_buffer(buffer, &buff_ind);
+			flags = get_flags(format, &i);
+			width = get_width(format, &i, list);
+			precision = get_precision(format, &i, list);
+			size = get_size(format, &i);
+			++i;
+			printed = handle_print(format, &i, list, buffer,
+								   flags, width, precision, size);
+			if (printed == -1)
+				return (-1);
+			printed_chars += printed;
+		}
+	}
 
-		for (i = len - 1; i >= 0; i--)
-                {
-                    write(1, &buffer[i], 1);
-                    count++;
-                }
-            }
-            else if (*format == 'u')
-            {
-                unsigned int num = va_arg(args, unsigned int);
-                int len = 0;
-                unsigned int temp = num;
+	print_buffer(buffer, &buff_ind);
+	va_end(list);
 
-                if (num == 0)
-                {
-                    buffer[len++] = '0';
-                }
-                else
-                {
-                    while (temp != 0)
-                    {
-                        buffer[len++] = (temp % 10) + '0';
-                        temp /= 10;
-                    }
-                }
-
-                for (i = len - 1; i >= 0; i--)
-                {
-                    write(1, &buffer[i], 1);
-                    count++;
-                }
-            }
-            else if (*format == 'o')
-            {
-                unsigned int num = va_arg(args, unsigned int);
-                int len = 0;
-                unsigned int temp = num;
-
-                if (num == 0)
-                {
-                    buffer[len++] = '0';
-                }
-                else
-                {
-                    while (temp != 0)
-                    {
-                        buffer[len++] = (temp % 8) + '0';
-                        temp /= 8;
-                    }
-                }
-
-                for (i = len - 1; i >= 0; i--)
-                {
-                    write(1, &buffer[i], 1);
-                    count++;
-                }
-            }
-            else if (*format == 'x' || *format == 'X')
-            {
-                unsigned int num = va_arg(args, unsigned int);
-                int len = 0;
-                unsigned int temp = num;
-
-                if (num == 0)
-                {
-                    buffer[len++] = '0';
-                }
-                else
-                {
-                    char hexChars[] = "0123456789abcdef";
-                    if (*format == 'X')
-                    {
-                        hexChars[10] = 'A';
-                        hexChars[11] = 'B';
-                        hexChars[12] = 'C';
-                        hexChars[13] = 'D';
-                        hexChars[14] = 'E';
-                        hexChars[15] = 'F';
-                    }
-                    while (temp != 0)
-                    {
-                        buffer[len++] = hexChars[temp % 16];
-                        temp /= 16;
-                    }
-                }
-
-                for (i = len - 1; i >= 0; i--)
-                {
-                    write(1, &buffer[i], 1);
-                    count++;
-                }
-            }
-            else if (*format == 'p')
-            {
-                unsigned long address = (unsigned long)va_arg(args, void *);
-                if (address == 0)
-                {
-                    write(1, "(nil)", 5);
-                    count += 5;
-                }
-                else
-                {
-			int len = 0;
-                    unsigned long temp = address;
-                    write(1, "0x", 2);
-                    count += 2;
-
-
-                    if (address == 0)
-                    {
-                        buffer[len++] = '0';
-                    }
-                    else
-                    {
-                        char hexChars[] = "0123456789abcdef";
-                        while (temp != 0)
-                        {
-                            buffer[len++] = hexChars[temp % 16];
-                            temp /= 16;
-                        }
-                    }
-
-                    for (i = len - 1; i >= 0; i--)
-                    {
-                        write(1, &buffer[i], 1);
-                        count++;
-                    }
-                }
-            }
-            else
-            {
-                write(1, "%", 1);
-                write(1, format, 1);
-                count += 2;
-            }
-            format++;
-        }
-        else
-        {
-            write(1, format, 1);
-            count++;
-            format++;
-        }
-    }
-
-    va_end(args);
-    return count;
+	return (printed_chars);
 }
+
